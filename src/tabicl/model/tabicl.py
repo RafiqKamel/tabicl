@@ -8,9 +8,7 @@ from .embedding import ColEmbedding
 from .interaction import RowInteraction
 from .learning import ICLearning
 from .inference_config import InferenceConfig
-from .tabpfn_arch.model.loading import load_model_criterion_config
-from .tabpfn_arch.model.transformer import PerFeatureTransformer as ContextCompressionTransformer
-from .tabpfn_arch.model.config import ModelConfig as TabPFNModelConfig
+from torch.utils.checkpoint import checkpoint
 
 import torch
 
@@ -202,8 +200,8 @@ class TabICL(nn.Module):
         if not self.use_compressor:
             return X, y_train
 
-        enc_train = self.context_compression_transformer(X[:, :train_size])  # (B, train, H)
-        enc_test = self.context_compression_transformer(X[:, train_size:])
+        enc_train = checkpoint(self.context_compression_transformer(X[:, :train_size]))  # (B, train, H)
+        enc_test = checkpoint(self.context_compression_transformer(X[:, train_size:]))
 
         # TO USE THE COMPRESSOR PROJECTOR WE HAVE TO INSTANTIATE IT FOR EACH BATCH, SINCE BATCHES WILL HAVE
         # DIFFERENT NUMBER OF FEATURES.
