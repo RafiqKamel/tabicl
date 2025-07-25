@@ -200,8 +200,8 @@ class TabICL(nn.Module):
         if not self.use_compressor:
             return X, y_train
 
-        enc_train = checkpoint(self.context_compression_transformer(X[:, :train_size]))  # (B, train, H)
-        enc_test = checkpoint(self.context_compression_transformer(X[:, train_size:]))
+        enc_train = checkpoint(self.context_compression_transformer, X[:, :train_size])  # (B, train, H)
+        enc_test = checkpoint(self.context_compression_transformer, X[:, train_size:])
 
         # TO USE THE COMPRESSOR PROJECTOR WE HAVE TO INSTANTIATE IT FOR EACH BATCH, SINCE BATCHES WILL HAVE
         # DIFFERENT NUMBER OF FEATURES.
