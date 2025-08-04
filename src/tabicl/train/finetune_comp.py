@@ -186,9 +186,10 @@ class TrainerCompFinetuner:
                 "use_compressor": self.config.use_compressor,
                 "row_compression_percentage": self.config.row_compression_percentage
             })
+            self.model_config = model_cfg
 
             # build model & load backbone checkpoint (only compressor weights should be missing)
-            model = TabICL(**model_cfg).to(self.config.device)
+            model = TabICL(**self.model_config).to(self.config.device)
             missing, unexpected = model.load_state_dict(ckpt["state_dict"],
                                                         strict=False)
             if self.master_process:
@@ -197,7 +198,7 @@ class TrainerCompFinetuner:
                       f"Unexpected: {len(unexpected)}")
         else:
             # start from scratch → gather hyper-params from CLI
-            model_cfg = {
+            self.model_config = {
                 "max_classes": self.config.max_classes,
                 "embed_dim": self.config.embed_dim,
                 "col_num_blocks": self.config.col_num_blocks,
@@ -216,7 +217,7 @@ class TrainerCompFinetuner:
                 "use_compressor": self.config.use_compressor,
                 "row_compression_percentage": self.config.row_compression_percentage
             }
-            model = TabICL(**model_cfg).to(self.config.device)
+            model = TabICL(**self.model_config).to(self.config.device)
 
         if self.master_process:
             num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
