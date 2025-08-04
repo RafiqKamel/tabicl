@@ -192,6 +192,8 @@ class TabICL(nn.Module):
                 norm_first=self.norm_first,
                 max_features=self.compressor_max_features,
             )
+        else:
+            raise ValueError(f"Unsupported compressor architecture: {self.compressor_arch}")    
 
     def _compress(self, X: Tensor, y_train: Tensor, train_size: int):
         """Compress the input tensor X using the context compression transformer.
