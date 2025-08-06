@@ -243,7 +243,9 @@ class TabICL(nn.Module):
 
         X_compressed = torch.cat([ctx_compressed, X_test], dim=1)  # (B, T, H)
 
-        return X_compressed, y_train
+        y_keep = y_train[:, train_size - keep: train_size]
+
+        return X_compressed, y_keep, keep
 
     def _train_forward(
         self, X: Tensor, y_train: Tensor, d: Optional[Tensor] = None, embed_with_test: bool = False
@@ -276,8 +278,8 @@ class TabICL(nn.Module):
         B, T, H = X.shape
         train_size = y_train.shape[1]
         assert train_size <= T, "Number of training samples exceeds total samples"
-        X_compressed, y_train_compressed = self._compress(X=X, y_train=y_train, train_size=train_size)
-        effective_train_size = y_train_compressed.shape[1]
+        X_compressed, y_train_compressed, keep = self._compress(X=X, y_train=y_train, train_size=train_size)
+        effective_train_size = keep
         # Check if d is provided and has the same length as the number of features
         if d is not None and len(d.unique()) == 1 and d[0] == H:
             d = None
@@ -349,8 +351,8 @@ class TabICL(nn.Module):
 
         train_size = y_train.shape[1]
         assert train_size <= X.shape[1], "Number of training samples exceeds total samples"
-        X_compressed, y_train_compressed = self._compress(X, y_train, train_size)
-        effective_train_size = y_train_compressed.shape[1]
+        X_compressed, y_train_compressed, keep = self._compress(X, y_train, train_size)
+        effective_train_size = keep
         if inference_config is None:
             inference_config = InferenceConfig()
 
