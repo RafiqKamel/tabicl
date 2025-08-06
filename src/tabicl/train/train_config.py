@@ -213,6 +213,8 @@ def build_parser():
             "If omitted (default) training starts from random initialisation."
         )
     )
+    parser.add_argument("--compressor_arch", type=str, default="tabpfn", help="Compressor architecture type")
+    parser.add_argument("--compressor_max_features", type=int, default=100, help="Maximum number of features for compressor. only used when compressor_arch is tabicl")
 
     ###########################################################################
     ###### Checkpointing ######################################################

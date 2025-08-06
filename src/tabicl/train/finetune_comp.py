@@ -184,7 +184,9 @@ class TrainerCompFinetuner:
 
             model_cfg.update({
                 "use_compressor": self.config.use_compressor,
-                "row_compression_percentage": self.config.row_compression_percentage
+                "row_compression_percentage": self.config.row_compression_percentage,
+                "compressor_arch": self.config.compressor_arch,
+                "compressor_max_features": self.config.compressor_max_features,
             })
             self.model_config = model_cfg
 
@@ -192,6 +194,7 @@ class TrainerCompFinetuner:
             model = TabICL(**self.model_config).to(self.config.device)
             missing, unexpected = model.load_state_dict(ckpt["state_dict"],
                                                         strict=False)
+            model.add_compressor()  # ensure compressor is added after loading state_dict
             if self.master_process:
                 print(f"Loaded legacy checkpoint from {ckpt_path}")
                 print(f"  Missing keys (new compressor): {len(missing)}  "
@@ -365,7 +368,7 @@ class TrainerCompFinetuner:
             checkpoint_path = self.get_latest_checkpoint()
 
         if checkpoint_path is None or not os.path.exists(checkpoint_path):
-            print("No checkpoint found, starting from scratch.")
+            print("No checkpoint found, starting from scratch or from the pretrained model.")
             return
 
         print(f"Loading checkpoint from {checkpoint_path}")

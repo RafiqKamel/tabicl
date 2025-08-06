@@ -157,10 +157,13 @@ class TabICL(nn.Module):
         self.compressor_projector = None
         self.compressor_arch = compressor_arch
         self.compressor_max_features = compressor_max_features
+
+
+    def add_compressor(self):
         if self.use_compressor:
             self.context_compression_transformer = self._build_compressor()
         else:
-            self.context_compression_transformer = None  # nothing to build
+            self.context_compression_transformer = None  # nothing to build    
 
 
     def _build_compressor(self):
