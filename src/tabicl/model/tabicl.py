@@ -230,8 +230,10 @@ class TabICL(nn.Module):
         if not self.use_compressor:
             return X, y_train
 
+        y_for_comp = y_train.clone()
+
         out_dict = self.context_compression_transformer(
-            X[:, :train_size, :].transpose(0, 1), y_train.transpose(0, 1), only_return_standard_out=False,
+            X[:, :train_size, :].transpose(0, 1), y_for_comp.transpose(0, 1), only_return_standard_out=False,
             single_eval_pos=single_eval_pos
         )
         enc_train = out_dict["test_embeddings"].permute(1, 0, 2)
