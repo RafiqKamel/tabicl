@@ -380,6 +380,7 @@ def load_model_criterion_config(
     which: Literal["regressor", "classifier"],
     version: Literal["v2"] = "v2",
     download: bool,
+    load_weights: bool = True,
 ) -> tuple[
     PerFeatureTransformer,
     nn.BCEWithLogitsLoss | nn.CrossEntropyLoss | FullSupportBarDistribution,
@@ -398,6 +399,7 @@ def load_model_criterion_config(
         which: Whether the model is a regressor or classifier.
         version: The version of the model.
         download: Whether to download the model if it doesn't exist.
+        load_weights: Whether to load the model weights from the checkpoint.
 
     Returns:
         The model, criterion, and config.
@@ -430,7 +432,7 @@ def load_model_criterion_config(
                 f"Then place it at: {model_path}",
             ) from res[0]
 
-    loaded_model, criterion, config = load_model(path=model_path)
+    loaded_model, criterion, config = load_model(path=model_path, load_weights=load_weights)
     loaded_model.cache_trainset_representation = cache_trainset_representation
     if check_bar_distribution_criterion and not isinstance(
         criterion,
@@ -661,6 +663,7 @@ def load_model_from_config(
 def load_model(
     *,
     path: Path,
+    load_weights: bool = True,
 ) -> tuple[
     PerFeatureTransformer,
     nn.BCEWithLogitsLoss | nn.CrossEntropyLoss | FullSupportBarDistribution,
@@ -670,6 +673,7 @@ def load_model(
 
     Args:
         path: Path to the checkpoint
+        load_weights: Whether to load the model weights from the checkpoint.
     """
     # Catch the `FutureWarning` that torch raises. This should be dealt with!
     # The warning is raised due to `torch.load`, which advises against ckpt
@@ -698,8 +702,9 @@ def load_model(
         assert len(criterion_state_keys) == 0, criterion_state_keys
 
     model = load_model_from_config(config=config, loss_criterion=loss_criterion)
-    model.load_state_dict(state_dict, strict=False)
-    model.eval()
+    if load_weights:
+        model.load_state_dict(state_dict, strict=True)
+    # model.eval()
 
     return model, loss_criterion, config
 

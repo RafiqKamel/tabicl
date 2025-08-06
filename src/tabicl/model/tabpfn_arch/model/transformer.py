@@ -129,6 +129,7 @@ class PerFeatureTransformer(nn.Module):
                     list[torch.Tensor | tuple[torch.Tensor, torch.Tensor]] | None
             ) = None,
             cache_trainset_representation: bool = False,
+            encode_test_set: bool = False,
             # TODO: List explicitly
             **layer_kwargs: Any,
     ):
@@ -163,6 +164,7 @@ class PerFeatureTransformer(nn.Module):
                 decoder and 2/3 for the encoder.
             use_encoder_compression_layer: Experimental
             precomputed_kv: Experimental
+            encode_test_set: Whether to encode the test set.
             layer_kwargs:
                 TODO: document.
                 for now have a look at layer.py:PerFeatureEncoderLayer.
@@ -198,8 +200,10 @@ class PerFeatureTransformer(nn.Module):
         self.ninp = config.emsize
         self.nhid_factor = config.nhid_factor
         nhid = self.ninp * self.nhid_factor
-        self.features_per_group = config.features_per_group
+        # self.features_per_group = config.features_per_group
+        self.features_per_group = 1
         self.cache_trainset_representation = cache_trainset_representation
+        self.encode_test_set = encode_test_set
         self.cached_embeddings: torch.Tensor | None = None
 
         layer_creator = lambda: PerFeatureEncoderLayer(
@@ -637,8 +641,9 @@ class PerFeatureTransformer(nn.Module):
         del embedded_input
 
         # out: s b e
-        test_encoder_out = encoder_out[:, single_eval_pos_:, -1].transpose(0, 1)
-
+        # test_encoder_out = encoder_out[:, single_eval_pos_:, -1].transpose(0, 1)
+        # Instead of taking only the target feature representation, we take all except the target
+        test_encoder_out = encoder_out[:, single_eval_pos_:, :-1].transpose(0, 1)
         if only_return_standard_out:
             assert self.decoder_dict is not None
             output_decoded = self.decoder_dict["standard"](test_encoder_out)

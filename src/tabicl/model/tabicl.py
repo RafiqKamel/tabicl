@@ -160,7 +160,7 @@ class TabICL(nn.Module):
         self.emsize = 192  # TabPFN embedding size
         self.compressor_projector = CompressorProjector(
             input_dim=self.emsize,
-            output_dim=self.compressor_max_features
+            output_dim=1
         )
         if self.use_compressor:
             self.context_compression_transformer = self._build_compressor()
@@ -179,6 +179,7 @@ class TabICL(nn.Module):
                 which="classifier",
                 version="v2",
                 download=True,
+                load_weights=True,
             )
             return model
         elif self.compressor_arch == "tabicl":
@@ -236,14 +237,15 @@ class TabICL(nn.Module):
             X[:, :train_size, :].transpose(0, 1), y_for_comp.transpose(0, 1), only_return_standard_out=False,
             single_eval_pos=single_eval_pos
         )
-        enc_train = out_dict["test_embeddings"].permute(1, 0, 2)
+        enc_train = out_dict["test_embeddings"].permute(1, 0, 2, 3)
         X_test = X[:, train_size:, :]
 
         proj_full = self.compressor_projector(enc_train)  # (B, train_size, max_features)
-        ctx_compressed = proj_full[:, :, :H]  # (B, train_size, H)
+        proj_full = proj_full.squeeze()
+        # ctx_compressed = proj_full[:, :, :H]  # (B, train_size, H)
 
 
-        X_compressed = torch.cat([ctx_compressed, X_test], dim=1)  # (B, T, H)
+        X_compressed = torch.cat([proj_full, X_test], dim=1)  # (B, T, H)
 
         y_keep = y_train[:, train_size - keep: train_size]
 
