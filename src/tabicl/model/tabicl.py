@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional, List
 from torch import nn, Tensor
 
-from .tabcompressor import TabCompressor
+from .tabcompressor import TabCompressor, CompressorProjector
 from .embedding import ColEmbedding
 from .interaction import RowInteraction
 from .learning import ICLearning
@@ -13,6 +13,7 @@ from .tabpfn_arch.model.transformer import PerFeatureTransformer as ContextCompr
 from .tabpfn_arch.model.config import ModelConfig as TabPFNModelConfig
 
 import torch
+import math
 
 
 class TabICL(nn.Module):
@@ -98,7 +99,7 @@ class TabICL(nn.Module):
         use_compressor: bool = True,
         row_compression_percentage: float = 10,
         compressor_arch: str = "tabpfn",
-        compressor_max_features: int = 1000,
+        compressor_max_features: int = 100,
     ):
         super().__init__()
         self.max_classes = max_classes
@@ -154,9 +155,13 @@ class TabICL(nn.Module):
         )
         self.use_compressor = use_compressor
         self.row_compression_percentage = row_compression_percentage
-        self.compressor_projector = None
         self.compressor_arch = compressor_arch
         self.compressor_max_features = compressor_max_features
+        self.emsize = 192  # TabPFN embedding size
+        self.compressor_projector = CompressorProjector(
+            input_dim=self.emsize,
+            output_dim=self.compressor_max_features
+        )
         if self.use_compressor:
             self.context_compression_transformer = self._build_compressor()
         else:
@@ -218,17 +223,25 @@ class TabICL(nn.Module):
         Tensor
             Compressed tensor of shape (B, T, H') where H' is the compressed feature dimension.
         """
-        B, _, H = X.shape
+        x_train = X[:, :train_size, :]  # (B, train_size, H)
+        B, T, H = x_train.shape
+        keep = math.ceil(T * self.row_compression_percentage / 100)
+        single_eval_pos = train_size - keep  # first of the *kept* rows
         if not self.use_compressor:
             return X, y_train
 
-        enc_train, y_train = self.context_compression_transformer(
-            X[:, :train_size, :], y_train
+        out_dict = self.context_compression_transformer(
+            X[:, :train_size, :].transpose(0, 1), y_train.transpose(0, 1), only_return_standard_out=False,
+            single_eval_pos=single_eval_pos
         )
+        enc_train = out_dict["test_embeddings"].permute(1, 0, 2)
         X_test = X[:, train_size:, :]
 
+        proj_full = self.compressor_projector(enc_train)  # (B, train_size, max_features)
+        ctx_compressed = proj_full[:, :, :H]  # (B, train_size, H)
 
-        X_compressed = torch.cat([enc_train, X_test], dim=1)  # (B, T, H)
+
+        X_compressed = torch.cat([ctx_compressed, X_test], dim=1)  # (B, T, H)
 
         return X_compressed, y_train
 

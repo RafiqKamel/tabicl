@@ -46,12 +46,12 @@ class LayerStack(nn.Module):
     """
 
     def __init__(
-        self,
-        *,
-        layer_creator: Callable[[], nn.Module],
-        num_layers: int,
-        recompute_each_layer: bool = False,
-        min_num_layers_layer_dropout: int | None = None,
+            self,
+            *,
+            layer_creator: Callable[[], nn.Module],
+            num_layers: int,
+            recompute_each_layer: bool = False,
+            min_num_layers_layer_dropout: int | None = None,
     ):
         super().__init__()
         self.layers = nn.ModuleList([layer_creator() for _ in range(num_layers)])
@@ -64,15 +64,15 @@ class LayerStack(nn.Module):
         self.recompute_each_layer = recompute_each_layer
 
     def forward(
-        self,
-        x: torch.Tensor,
-        *,
-        half_layers: bool = False,
-        **kwargs: Any,
+            self,
+            x: torch.Tensor,
+            *,
+            half_layers: bool = False,
+            **kwargs: Any,
     ) -> torch.Tensor:
         if half_layers:
             assert (
-                self.min_num_layers_layer_dropout == self.num_layers
+                    self.min_num_layers_layer_dropout == self.num_layers
             ), "half_layers only works without layer dropout"
             n_layers = self.num_layers // 2
         else:
@@ -104,34 +104,33 @@ class PerFeatureTransformer(nn.Module):
     """
 
     def __init__(  # noqa: D417, PLR0913
-        self,
-        *,
-        config: ModelConfig,
-        encoder: nn.Module | None = None,
-        y_encoder: nn.Module | None = None,
-        n_out: int = 1,
-        activation: Literal["gelu", "relu"] = "gelu",
-        min_num_layers_layer_dropout: int | None = None,
-        repeat_same_layer: bool = False,
-        feature_positional_embedding: (
-            Literal[
-                "normal_rand_vec",
-                "uni_rand_vec",
-                "learned",
-                "subspace",
-            ]
-            | None
-        ) = None,
-        zero_init: bool = True,
-        nlayers_decoder: int | None = None,
-        use_encoder_compression_layer: bool = False,
-        precomputed_kv: (
-            list[torch.Tensor | tuple[torch.Tensor, torch.Tensor]] | None
-        ) = None,
-        cache_trainset_representation: bool = False,
-        row_compression_percentage: float = 10,
-        # TODO: List explicitly
-        **layer_kwargs: Any,
+            self,
+            *,
+            config: ModelConfig,
+            encoder: nn.Module | None = None,
+            y_encoder: nn.Module | None = None,
+            n_out: int = 1,
+            activation: Literal["gelu", "relu"] = "gelu",
+            min_num_layers_layer_dropout: int | None = None,
+            repeat_same_layer: bool = False,
+            feature_positional_embedding: (
+                    Literal[
+                        "normal_rand_vec",
+                        "uni_rand_vec",
+                        "learned",
+                        "subspace",
+                    ]
+                    | None
+            ) = None,
+            zero_init: bool = True,
+            nlayers_decoder: int | None = None,
+            use_encoder_compression_layer: bool = False,
+            precomputed_kv: (
+                    list[torch.Tensor | tuple[torch.Tensor, torch.Tensor]] | None
+            ) = None,
+            cache_trainset_representation: bool = False,
+            # TODO: List explicitly
+            **layer_kwargs: Any,
     ):
         """Initializes the PerFeatureTransformer module.
 
@@ -173,7 +172,7 @@ class PerFeatureTransformer(nn.Module):
         if encoder is None:
             encoder = SequentialEncoder(
                 LinearInputEncoderStep(
-                    num_features=config.features_per_group or 1,
+                    num_features=1,
                     emsize=config.emsize,
                     replace_nan_by_zero=False,
                     bias=True,
@@ -276,9 +275,6 @@ class PerFeatureTransformer(nn.Module):
         self.dag_pos_enc_dim = config.dag_pos_enc_dim
         self.cached_feature_positional_embeddings: torch.Tensor | None = None
         self.seed = config.seed
-        
-        self.compressor_projector = CompressorProjector(input_dim=config.emsize, output_dim=1)
-        self.row_compression_percentage = row_compression_percentage
 
     def reset_save_peak_mem_factor(self, factor: int | None = None) -> None:
         """Sets the save_peak_mem_factor for all layers.
@@ -377,6 +373,7 @@ class PerFeatureTransformer(nn.Module):
             if test_x is not None:
                 x = torch.cat((x, test_x), dim=0)
             return self._forward(x, train_y, single_eval_pos=len(train_y), **kwargs)
+
         if len(args) == 2:
             x, y = args
             return self._forward(x, y, **kwargs)
@@ -388,18 +385,18 @@ class PerFeatureTransformer(nn.Module):
         raise ValueError("Unrecognized input. Please follow the doc string.")
 
     def _forward(  # noqa: PLR0912, C901
-        self,
-        x: torch.Tensor | dict,
-        # TODO(eddiebergman): Not sure if it can be None but the function seems to
-        # indicate it could
-        y: torch.Tensor | dict | None,
-        *,
-        single_eval_pos: int | None = None,
-        only_return_standard_out: bool = True,
-        style: torch.Tensor | None = None,
-        data_dags: list[Any] | None = None,
-        categorical_inds: list[list[int]] | None = None,
-        half_layers: bool = False,
+            self,
+            x: torch.Tensor | dict,
+            # TODO(eddiebergman): Not sure if it can be None but the function seems to
+            # indicate it could
+            y: torch.Tensor | dict | None,
+            *,
+            single_eval_pos: int | None = None,
+            only_return_standard_out: bool = False,
+            style: torch.Tensor | None = None,
+            data_dags: list[Any] | None = None,
+            categorical_inds: list[list[int]] | None = None,
+            half_layers: bool = False,
     ) -> Any | dict[str, torch.Tensor]:
         """The core forward pass of the model.
 
@@ -451,8 +448,8 @@ class PerFeatureTransformer(nn.Module):
 
             # pad to multiple of features_per_group
             missing_to_next = (
-                self.features_per_group - (num_features_ % self.features_per_group)
-            ) % self.features_per_group
+                                      self.features_per_group - (num_features_ % self.features_per_group)
+                              ) % self.features_per_group
 
             if missing_to_next > 0:
                 x[k] = torch.cat(
@@ -503,6 +500,7 @@ class PerFeatureTransformer(nn.Module):
                     new_categorical_inds.append(subgroup_indices)
 
             categorical_inds_to_use = new_categorical_inds
+
         for k in y:
             if y[k].ndim == 1:
                 y[k] = y[k].unsqueeze(-1)
@@ -513,8 +511,8 @@ class PerFeatureTransformer(nn.Module):
 
             if y[k].shape[1] < x["main"].shape[1]:
                 assert (
-                    y[k].shape[1] == single_eval_pos_
-                    or y[k].shape[1] == x["main"].shape[1]
+                        y[k].shape[1] == single_eval_pos_
+                        or y[k].shape[1] == x["main"].shape[1]
                 )
                 assert k != "main" or y[k].shape[1] == single_eval_pos_, (
                     "For main y, y must not be given for target"
@@ -540,7 +538,7 @@ class PerFeatureTransformer(nn.Module):
 
         # making sure no label leakage ever happens
         y["main"][single_eval_pos_:] = torch.nan
-        
+
         embedded_y = self.y_encoder(
             y,
             single_eval_pos=single_eval_pos_,
@@ -556,8 +554,8 @@ class PerFeatureTransformer(nn.Module):
 
         extra_encoders_args = {}
         if categorical_inds_to_use is not None and isinstance(
-            self.encoder,
-            SequentialEncoder,
+                self.encoder,
+                SequentialEncoder,
         ):
             # Transform cat. features accordingly to correspond to following to merge
             # of batch and feature_group dimensions below (i.e., concat lists)
@@ -584,10 +582,10 @@ class PerFeatureTransformer(nn.Module):
             num_features=num_features,
             seq_len=seq_len,
             cache_embeddings=(
-                self.cache_trainset_representation and single_eval_pos is not None
+                    self.cache_trainset_representation and single_eval_pos is not None
             ),
             use_cached_embeddings=(
-                self.cache_trainset_representation and single_eval_pos is None
+                    self.cache_trainset_representation and single_eval_pos is None
             ),
         )
         del data_dags
@@ -615,41 +613,63 @@ class PerFeatureTransformer(nn.Module):
             cache_trainset_representation=self.cache_trainset_representation,
         )  # b s f+1 e -> b s f+1 e
 
+        # If we are using a decoder
+        if self.transformer_decoder:
+            assert not half_layers
+            assert encoder_out.shape[1] == single_eval_pos_
 
-        comp_xy = self.compressor_projector(encoder_out)
-        comp_xy = comp_xy.view(comp_xy.size(0), comp_xy.size(1), -1)
-        comp_x = comp_xy[:, :, :-1]  # b s f
-        comp_y = comp_xy[:, :, -1:]  # b s 1
-        comp_y = comp_y.squeeze(-1)  # b s 1 -> b s
-        if self.row_compression_percentage > 0:
-            num_rows = comp_x.shape[0]
-            num_rows_to_keep = int(
-                num_rows * (1 - self.row_compression_percentage / 100)
-            )
-            if num_rows_to_keep < 1:
-                raise ValueError(
-                    f"Row compression percentage {self.row_compression_percentage} "
-                    "is too high, resulting in less than 1 row to keep."
+            if self.global_att_embeddings_for_compression is not None:
+                # TODO: fixed number of compression tokens
+                train_encoder_out = self.encoder_compression_layer(
+                    self.global_att_embeddings_for_compression,
+                    att_src=encoder_out[:, single_eval_pos_],
+                    single_eval_pos=single_eval_pos_,
                 )
-            indices_to_keep = range(num_rows_to_keep)
-            comp_x = comp_x[indices_to_keep,:, :]
-            comp_y = comp_y[indices_to_keep, :]
-        return comp_x, comp_y
+
+            test_encoder_out = self.transformer_decoder(
+                embedded_input[:, single_eval_pos_:],
+                single_eval_pos=0,
+                att_src=encoder_out,
+            )
+            encoder_out = torch.cat([encoder_out, test_encoder_out], 1)
+            del test_encoder_out
+
+        del embedded_input
+
+        # out: s b e
+        test_encoder_out = encoder_out[:, single_eval_pos_:, -1].transpose(0, 1)
+
+        if only_return_standard_out:
+            assert self.decoder_dict is not None
+            output_decoded = self.decoder_dict["standard"](test_encoder_out)
+        else:
+            output_decoded = (
+                {k: v(test_encoder_out) for k, v in self.decoder_dict.items()}
+                if self.decoder_dict is not None
+                else {}
+            )
+
+            # out: s b e
+            train_encoder_out = encoder_out[:, :single_eval_pos_, -1].transpose(0, 1)
+            output_decoded["train_embeddings"] = train_encoder_out
+            output_decoded["test_embeddings"] = test_encoder_out
+
+        return output_decoded
 
     def add_embeddings(  # noqa: C901, PLR0912
-        self,
-        x: torch.Tensor,
-        y: torch.Tensor,
-        *,
-        data_dags: Iterable[nx.DiGraph] | None,
-        num_features: int,
-        seq_len: int,
-        cache_embeddings: bool = False,
-        use_cached_embeddings: bool = False,
+            self,
+            x: torch.Tensor,
+            y: torch.Tensor,
+            *,
+            data_dags: Iterable[nx.DiGraph] | None,
+            num_features: int,
+            seq_len: int,
+            cache_embeddings: bool = False,
+            use_cached_embeddings: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         if use_cached_embeddings and self.cached_embeddings is not None:
             assert (
-                data_dags is None
+                    data_dags is None
             ), "Caching embeddings is not supported with data_dags at this point."
             x += self.cached_embeddings[None, None]
             return x, y
@@ -666,13 +686,13 @@ class PerFeatureTransformer(nn.Module):
                 x += embs[None, None]
             elif self.feature_positional_embedding == "uni_rand_vec":
                 embs = (
-                    torch.rand(
-                        (x.shape[2], x.shape[3]),
-                        device=x.device,
-                        dtype=x.dtype,
-                    )
-                    * 2
-                    - 1
+                        torch.rand(
+                            (x.shape[2], x.shape[3]),
+                            device=x.device,
+                            dtype=x.dtype,
+                        )
+                        * 2
+                        - 1
                 )
                 x += embs[None, None]
             elif self.feature_positional_embedding == "learned":
@@ -701,7 +721,7 @@ class PerFeatureTransformer(nn.Module):
         self.cached_embeddings = None
         if cache_embeddings and embs is not None:
             assert (
-                data_dags is None
+                    data_dags is None
             ), "Caching embeddings is not supported with data_dags at this point."
             self.cached_embeddings = embs
 
@@ -764,7 +784,7 @@ class PerFeatureTransformer(nn.Module):
             layer.empty_trainset_representation_cache()
 
     def _transform_categorical_indices_feat_groups(
-        self, categorical_inds: list[int], n_subgroups: int
+            self, categorical_inds: list[int], n_subgroups: int
     ) -> list[list[int]]:
         """Transform the categorical indices list(s)
         to align with the feature groups.
@@ -813,10 +833,10 @@ def _networkx_add_direct_connections(graph: nx.DiGraph) -> bool:
 
 
 def _add_pos_emb(
-    graph: nx.DiGraph,
-    *,
-    is_undirected: bool = False,
-    k: int = 20,
+        graph: nx.DiGraph,
+        *,
+        is_undirected: bool = False,
+        k: int = 20,
 ) -> None:
     from scipy.sparse.linalg import eigs, eigsh
 
@@ -835,7 +855,7 @@ def _add_pos_emb(
         )
 
         eig_vecs = np.real(eig_vecs[:, eig_vals.argsort()])
-        pe_ = torch.from_numpy(eig_vecs[:, 1 : k + 1])
+        pe_ = torch.from_numpy(eig_vecs[:, 1: k + 1])
         pe = torch.zeros(len(eig_vecs), k)
         pe[:, : pe_.shape[1]] = pe_
         sign = -1 + 2 * torch.randint(0, 2, (k,))
@@ -844,6 +864,7 @@ def _add_pos_emb(
         # TODO(old) Double check the ordering is right
         for n, pe_ in zip(graph.nodes(), pe):
             graph.nodes[n]["positional_encoding"] = pe_
+
 
 class CompressorProjector(nn.Module):
     """A simple projector for the compressor.
@@ -854,10 +875,10 @@ class CompressorProjector(nn.Module):
     """
 
     def __init__(
-        self,
-        input_dim: int = 128,
-        output_dim: int = 1,
-    ):  
+            self,
+            input_dim: int = 128,
+            output_dim: int = 1,
+    ):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -866,8 +887,9 @@ class CompressorProjector(nn.Module):
             nn.GELU(),
             nn.Linear(input_dim, output_dim)
         )
-        
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.projector(x)        
 
-        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.projector(x)
+
+
+
