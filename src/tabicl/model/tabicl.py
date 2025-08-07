@@ -282,8 +282,13 @@ class TabICL(nn.Module):
         B, T, H = X.shape
         train_size = y_train.shape[1]
         assert train_size <= T, "Number of training samples exceeds total samples"
-        X_compressed, y_train_compressed, keep = self._compress(X=X, y_train=y_train, train_size=train_size)
-        effective_train_size = keep
+        if self.use_compressor:
+            X_compressed, y_train_compressed, keep = self._compress(X=X, y_train=y_train, train_size=train_size)
+            effective_train_size = keep
+        else:
+            X_compressed = X
+            y_train_compressed = y_train
+            effective_train_size = train_size
         # Check if d is provided and has the same length as the number of features
         if d is not None and len(d.unique()) == 1 and d[0] == H:
             d = None
