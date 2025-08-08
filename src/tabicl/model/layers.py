@@ -556,6 +556,8 @@ class InducedSelfAttentionBlock(nn.Module):
 
         if train_size is None:
             hidden = self.multihead_attn1(ind_vectors, src, src)
+        elif train_size == 0:
+            hidden = self.multihead_attn1(ind_vectors, ind_vectors, ind_vectors)
         else:
             hidden = self.multihead_attn1(ind_vectors, src[..., :train_size, :], src[..., :train_size, :])
 
