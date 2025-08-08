@@ -641,9 +641,9 @@ class PerFeatureTransformer(nn.Module):
         del embedded_input
 
         # out: s b e
-        # test_encoder_out = encoder_out[:, single_eval_pos_:, -1].transpose(0, 1)
+        test_encoder_out = encoder_out[:, single_eval_pos_:, -1].transpose(0, 1)
         # Instead of taking only the target feature representation, we take all except the target
-        test_encoder_out = encoder_out[:, single_eval_pos_:, :-1].transpose(0, 1)
+        # test_encoder_out = encoder_out[:, single_eval_pos_:, :-1].transpose(0, 1)
         if only_return_standard_out:
             assert self.decoder_dict is not None
             output_decoded = self.decoder_dict["standard"](test_encoder_out)
