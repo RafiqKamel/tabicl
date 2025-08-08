@@ -231,6 +231,8 @@ class TabICL(nn.Module):
         Tensor
             Compressed tensor of shape (B, T, H') where H' is the compressed feature dimension.
         """
+        if not self.use_compressor:
+            return X, y_train
         assert train_size <= X.shape[1]
         B, _, H = X.shape
         keep = max(1, math.ceil(train_size * self.row_compression_percentage / 100))
@@ -255,65 +257,64 @@ class TabICL(nn.Module):
         y_keep = y_train[:, train_size - keep: train_size]  # (B, k)
         return ctx_tokens, y_keep, keep
 
-    # OLD _train_forward method, kept for reference
-    # def _train_forward(
-    #     self, X: Tensor, y_train: Tensor, d: Optional[Tensor] = None, embed_with_test: bool = False
-    # ) -> Tensor:
-    #     """Column-wise embedding -> row-wise interaction -> dataset-wise in-context learning for training.
-    #
-    #     Parameters
-    #     ----------
-    #     X : Tensor
-    #         Input tensor of shape (B, T, H) where:
-    #          - B is the number of tables
-    #          - T is the number of samples (rows)
-    #          - H is the number of features (columns)
-    #         The first train_size positions contain training samples, and the remaining positions contain test samples.
-    #
-    #     y_train : Tensor
-    #         Training labels of shape (B, train_size) where:
-    #          - B is the number of tables
-    #          - train_size is the number of training samples provided for in-context learning
-    #
-    #     d : Optional[Tensor], default=None
-    #         The number of features per dataset.
-    #
-    #     Returns
-    #     -------
-    #     Tensor
-    #         Raw logits of shape (B, T, max_classes), which will be further handled by the training code.
-    #     """
-    #
-    #     B, T, H = X.shape
-    #     train_size = y_train.shape[1]
-    #     assert train_size <= T, "Number of training samples exceeds total samples"
-    #     if self.use_compressor:
-    #         X_compressed, y_train_compressed, keep = self._compress(X=X, y_train=y_train, train_size=train_size)
-    #         effective_train_size = keep
-    #     else:
-    #         X_compressed = X
-    #         y_train_compressed = y_train
-    #         effective_train_size = train_size
-    #     # Check if d is provided and has the same length as the number of features
-    #     if d is not None and len(d.unique()) == 1 and d[0] == H:
-    #         d = None
-    #
-    #     # Column-wise embedding -> Row-wise interaction
-    #     representations = self.row_interactor(
-    #         self.col_embedder(
-    #             X_compressed,
-    #             d=d,  # or mgr_config in inference
-    #             train_size=None if embed_with_test else effective_train_size
-    #         ),
-    #         d=d
-    #     )
-    #
-    #     # Dataset-wise in-context learning
-    #     out = self.icl_predictor(representations, y_train=y_train_compressed)
-    #
-    #     return out
+    def _train_forward(
+        self, X: Tensor, y_train: Tensor, d: Optional[Tensor] = None, embed_with_test: bool = False
+    ) -> Tensor:
+        """Column-wise embedding -> row-wise interaction -> dataset-wise in-context learning for training.
 
-    def _train_forward(self, X: Tensor, y_train: Tensor, d: Optional[Tensor] = None,
+        Parameters
+        ----------
+        X : Tensor
+            Input tensor of shape (B, T, H) where:
+             - B is the number of tables
+             - T is the number of samples (rows)
+             - H is the number of features (columns)
+            The first train_size positions contain training samples, and the remaining positions contain test samples.
+
+        y_train : Tensor
+            Training labels of shape (B, train_size) where:
+             - B is the number of tables
+             - train_size is the number of training samples provided for in-context learning
+
+        d : Optional[Tensor], default=None
+            The number of features per dataset.
+
+        Returns
+        -------
+        Tensor
+            Raw logits of shape (B, T, max_classes), which will be further handled by the training code.
+        """
+
+        B, T, H = X.shape
+        train_size = y_train.shape[1]
+        assert train_size <= T, "Number of training samples exceeds total samples"
+        if self.use_compressor:
+            X_compressed, y_train_compressed, keep = self._compress(X=X, y_train=y_train, train_size=train_size)
+            effective_train_size = keep
+        else:
+            X_compressed = X
+            y_train_compressed = y_train
+            effective_train_size = train_size
+        # Check if d is provided and has the same length as the number of features
+        if d is not None and len(d.unique()) == 1 and d[0] == H:
+            d = None
+
+        # Column-wise embedding -> Row-wise interaction
+        representations = self.row_interactor(
+            self.col_embedder(
+                X_compressed,
+                d=d,  # or mgr_config in inference
+                train_size=None if embed_with_test else effective_train_size
+            ),
+            d=d
+        )
+
+        # Dataset-wise in-context learning
+        out = self.icl_predictor(representations, y_train=y_train_compressed)
+
+        return out
+
+    def _train_forward_compress(self, X: Tensor, y_train: Tensor, d: Optional[Tensor] = None,
                        embed_with_test: bool = False) -> Tensor:
         B, T, H = X.shape
         train_size = y_train.shape[1]
@@ -344,7 +345,7 @@ class TabICL(nn.Module):
         out = self.icl_predictor(representations, y_train=y_ctx)
         return out
 
-    def _inference_forward(
+    def _inference_forward_compress(
             self,
             X: Tensor,
             y_train: Tensor,
@@ -386,85 +387,84 @@ class TabICL(nn.Module):
         )
         return out
 
-    # OLD _inference_forward method, kept for reference
-    # def _inference_forward(
-    #     self,
-    #     X: Tensor,
-    #     y_train: Tensor,
-    #     feature_shuffles: Optional[List[List[int]]] = None,
-    #     embed_with_test: bool = False,
-    #     return_logits: bool = True,
-    #     softmax_temperature: float = 0.9,
-    #     inference_config: InferenceConfig = None,
-    # ) -> Tensor:
-    #     """Column-wise embedding -> row-wise interaction -> dataset-wise in-context learning.
-    #
-    #     Parameters
-    #     ----------
-    #     X : Tensor
-    #         Input tensor of shape (B, T, H) where:
-    #          - B is the number of tables
-    #          - T is the number of samples (rows)
-    #          - H is the number of features (columns)
-    #         The first train_size positions contain training samples, and the remaining positions contain test samples.
-    #
-    #     y_train : Tensor
-    #         Training labels of shape (B, train_size) where:
-    #          - B is the number of tables
-    #          - train_size is the number of training samples provided for in-context learning
-    #
-    #     feature_shuffles : Optional[List[List[int]]], default=None
-    #         A list of feature shuffle patterns for each table in the batch.
-    #         When provided, indicates that X contains the same table with different feature orders.
-    #         In this case, column-wise embeddings are computed once and then shuffled accordingly.
-    #
-    #     embed_with_test : bool, default=False
-    #         If True, allow training samples to attend to test samples during embedding
-    #
-    #     return_logits : bool, default=True
-    #         If True, return raw logits instead of probabilities
-    #
-    #     softmax_temperature : float, default=0.9
-    #         Temperature for the softmax function
-    #
-    #     inference_config: InferenceConfig
-    #         Inference configuration
-    #
-    #     Returns
-    #     -------
-    #     Tensor
-    #         Raw logits or probabilities for test samples of shape (B, test_size, num_classes)
-    #         where test_size = T - train_size
-    #     """
-    #
-    #     train_size = y_train.shape[1]
-    #     assert train_size <= X.shape[1], "Number of training samples exceeds total samples"
-    #     X_compressed, y_train_compressed, keep = self._compress(X, y_train, train_size)
-    #     effective_train_size = keep
-    #     if inference_config is None:
-    #         inference_config = InferenceConfig()
-    #
-    #     # Column-wise embedding -> Row-wise interaction
-    #     representations = self.row_interactor(
-    #         self.col_embedder(
-    #             X_compressed,
-    #             train_size=None if embed_with_test else effective_train_size,
-    #             feature_shuffles=feature_shuffles,
-    #             mgr_config=inference_config.COL_CONFIG,
-    #         ),
-    #         mgr_config=inference_config.ROW_CONFIG,
-    #     )
-    #
-    #     # Dataset-wise in-context learning
-    #     out = self.icl_predictor(
-    #         representations,
-    #         y_train=y_train_compressed,
-    #         return_logits=return_logits,
-    #         softmax_temperature=softmax_temperature,
-    #         mgr_config=inference_config.ICL_CONFIG,
-    #     )
-    #
-    #     return out
+    def _inference_forward(
+        self,
+        X: Tensor,
+        y_train: Tensor,
+        feature_shuffles: Optional[List[List[int]]] = None,
+        embed_with_test: bool = False,
+        return_logits: bool = True,
+        softmax_temperature: float = 0.9,
+        inference_config: InferenceConfig = None,
+    ) -> Tensor:
+        """Column-wise embedding -> row-wise interaction -> dataset-wise in-context learning.
+
+        Parameters
+        ----------
+        X : Tensor
+            Input tensor of shape (B, T, H) where:
+             - B is the number of tables
+             - T is the number of samples (rows)
+             - H is the number of features (columns)
+            The first train_size positions contain training samples, and the remaining positions contain test samples.
+
+        y_train : Tensor
+            Training labels of shape (B, train_size) where:
+             - B is the number of tables
+             - train_size is the number of training samples provided for in-context learning
+
+        feature_shuffles : Optional[List[List[int]]], default=None
+            A list of feature shuffle patterns for each table in the batch.
+            When provided, indicates that X contains the same table with different feature orders.
+            In this case, column-wise embeddings are computed once and then shuffled accordingly.
+
+        embed_with_test : bool, default=False
+            If True, allow training samples to attend to test samples during embedding
+
+        return_logits : bool, default=True
+            If True, return raw logits instead of probabilities
+
+        softmax_temperature : float, default=0.9
+            Temperature for the softmax function
+
+        inference_config: InferenceConfig
+            Inference configuration
+
+        Returns
+        -------
+        Tensor
+            Raw logits or probabilities for test samples of shape (B, test_size, num_classes)
+            where test_size = T - train_size
+        """
+
+        train_size = y_train.shape[1]
+        assert train_size <= X.shape[1], "Number of training samples exceeds total samples"
+        X_compressed, y_train_compressed, keep = self._compress(X, y_train, train_size)
+        effective_train_size = keep
+        if inference_config is None:
+            inference_config = InferenceConfig()
+
+        # Column-wise embedding -> Row-wise interaction
+        representations = self.row_interactor(
+            self.col_embedder(
+                X_compressed,
+                train_size=None if embed_with_test else effective_train_size,
+                feature_shuffles=feature_shuffles,
+                mgr_config=inference_config.COL_CONFIG,
+            ),
+            mgr_config=inference_config.ROW_CONFIG,
+        )
+
+        # Dataset-wise in-context learning
+        out = self.icl_predictor(
+            representations,
+            y_train=y_train_compressed,
+            return_logits=return_logits,
+            softmax_temperature=softmax_temperature,
+            mgr_config=inference_config.ICL_CONFIG,
+        )
+
+        return out
 
     def forward(
         self,
@@ -523,17 +523,30 @@ class TabICL(nn.Module):
               Raw logits or probabilities for test samples of shape (B, T-train_size, num_classes).
         """
 
-        if self.training:
-            out = self._train_forward(X, y_train, d=d, embed_with_test=embed_with_test)
+        if not self.use_compressor:
+            if self.training:
+                out = self._train_forward(X, y_train, d=d, embed_with_test=embed_with_test)
+            else:
+                out = self._inference_forward(
+                    X,
+                    y_train,
+                    feature_shuffles=feature_shuffles,
+                    embed_with_test=embed_with_test,
+                    return_logits=return_logits,
+                    softmax_temperature=softmax_temperature,
+                    inference_config=inference_config,
+                )
         else:
-            out = self._inference_forward(
-                X,
-                y_train,
-                feature_shuffles=feature_shuffles,
-                embed_with_test=embed_with_test,
-                return_logits=return_logits,
-                softmax_temperature=softmax_temperature,
-                inference_config=inference_config,
-            )
+            if self.training:
+                return self._train_forward_compress(X, y_train, d=d, embed_with_test=embed_with_test)
+            else:
+                return self._inference_forward_compress(
+                    X, y_train,
+                    feature_shuffles=feature_shuffles,
+                    embed_with_test=embed_with_test,
+                    return_logits=return_logits,
+                    softmax_temperature=softmax_temperature,
+                    inference_config=inference_config,
+                )
 
         return out
