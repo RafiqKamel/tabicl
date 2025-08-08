@@ -184,7 +184,7 @@ class TabICL(nn.Module):
                 load_weights=True,
             )
             # set emsize from the actual model
-            self.emsize = getattr(model, "ninp", getattr(model, "config", None).emsize)
+            self.emsize = getattr(model, "ninp")#, getattr(model, "config", None).emsize)
             icl_dim = self.embed_dim * self.row_num_cls
             self.ctx_adapter = nn.Linear(self.emsize, icl_dim)
 
