@@ -403,7 +403,7 @@ class MultiHeadAttention(Attention):
             x_kv = x
 
         k = v = kv = None
-        if use_cached_kv:
+        if use_cached_kv and self.has_cached_kv:
             assert (
                 self.has_cached_kv
             ), "You try to use cached keys and values but the cache is empty."
@@ -709,13 +709,14 @@ class MultiHeadAttention(Attention):
                 )
             else:
                 extra_inputs["enable_gqa"] = True
-            attention_head_outputs = torch.nn.functional.scaled_dot_product_attention(
-                q.transpose(1, 2),
-                k.transpose(1, 2),
-                v.transpose(1, 2),
-                dropout_p=dropout_p,
-                **extra_inputs,
-            )
+            with torch.backends.cuda.sdp_kernel(enable_flash=False, enable_math=True, enable_mem_efficient=False):
+                attention_head_outputs = torch.nn.functional.scaled_dot_product_attention(
+                    q.transpose(1, 2),
+                    k.transpose(1, 2),  
+                    v.transpose(1, 2),
+                    dropout_p=dropout_p,
+                    **extra_inputs,
+                )
             attention_head_outputs = attention_head_outputs.transpose(1, 2)
         else:
             k = MultiHeadAttention.broadcast_kv_across_heads(k, share_kv_across_n_heads)
